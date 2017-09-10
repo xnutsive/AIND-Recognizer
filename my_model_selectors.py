@@ -34,7 +34,8 @@ class ModelSelector(object):
     def base_model(self, num_states):
         # with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
-        # warnings.filterwarnings("ignore", category=RuntimeWarning)
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+
         try:
             hmm_model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
                                     random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
@@ -75,10 +76,28 @@ class SelectorBIC(ModelSelector):
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        best_score = float("inf")
+        best_num_states = self.min_n_components
 
+        for num_states in range(self.min_n_components, self.max_n_components):
+            try:
+                model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                logL = model.score(self.X, self.lengths)
+
+                params = num_states**2 + 2 * num_states * len(self.X[0]) - 1
+                bic = -2 * logL + math.log(len(self.X))*params
+
+                if bic < best_score:
+                    best_score = bic
+                    best_num_states = num_states
+            except:
+                pass
+
+
+        return self.base_model(best_num_states)
 
 class SelectorDIC(ModelSelector):
     ''' select best model based on Discriminative Information Criterion
@@ -92,9 +111,28 @@ class SelectorDIC(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        best_score = float("-inf")
+        best_num_states = self.min_n_components
+
+        for num_states in range(self.min_n_components, self.max_n_components):
+            try:
+                model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
+                                    random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                logL = model.score(self.X, self.lengths)
+                rest_words = len(self.hwords.keys()) - 1
+                rest_words_logL = sum([model.score(*self.hwords[key]) for key in self.hwords.keys() if key != self.this_word])
+                dic = logL - rest_words_logL/rest_words
+
+                if dic > best_score:
+                    best_score = dic
+                    best_num_states = num_states
+            except:
+                pass
+
+
+        return self.base_model(best_num_states)
 
 
 class SelectorCV(ModelSelector):
@@ -105,5 +143,30 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+        # Defaults
+        best_num_components = self.min_n_components
+        best_logL = float("inf")
+        split_method = KFold(n_splits=2)
+
+        for num_states in range(self.min_n_components, self.max_n_components):
+
+            total_logL = 0
+            num_folds = 0
+
+            for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                trainX, train_lengths = combine_sequences(cv_train_idx, self.sequences)
+                test_X, test_lengths = combine_sequences(cv_test_idx, self.sequences)
+                num_folds += 1
+
+                try:
+                    model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
+                                            random_state=self.random_state, verbose=False).fit(trainX, train_lengths)
+                    total_logL += model.score(test_X, test_lengths)
+                except:
+                    pass
+
+            if total_logL/num_folds < best_logL:
+                best_logL = total_logL/num_folds
+                best_num_components = num_states
+
+        return self.base_model(best_num_components)
