@@ -1,6 +1,6 @@
 import warnings
 from asl_data import SinglesData
-
+import arpa
 
 def recognize(models: dict, test_set: SinglesData):
     """ Recognize test word sequences from word models set
@@ -20,6 +20,23 @@ def recognize(models: dict, test_set: SinglesData):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
-    # TODO implement the recognizer
-    # return probabilities, guesses
-    raise NotImplementedError
+
+    for item in range(test_set.num_items):
+        probs = {}
+        best_prob = float("-inf")
+        best_guess = ""
+        for model_name in models:
+            try:
+                score = models[model_name].score(*test_set.get_item_sequences(item))
+                probs[model_name] = score
+                if score > best_prob:
+                    best_prob = score
+                    best_guess = model_name
+
+            except:
+                probs[model_name] = float("-inf")
+
+        probabilities.append(probs)
+        guesses.append(best_guess)
+
+    return (probabilities, guesses)

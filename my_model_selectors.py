@@ -87,7 +87,9 @@ class SelectorBIC(ModelSelector):
                                     random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
                 logL = model.score(self.X, self.lengths)
 
-                params = num_states**2 + 2 * num_states * len(self.X[0]) - 1
+                # FIXME research if I should use X[0] or just X.
+                # seems like a bug
+                params = num_states**2 + 2*num_states*len(self.X[0]) - 1
                 bic = -2 * logL + math.log(len(self.X))*params
 
                 if bic < best_score:
@@ -142,31 +144,37 @@ class SelectorCV(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-        # Defaults
+        # Initialize with a default and the worst possible score
         best_num_components = self.min_n_components
-        best_logL = float("inf")
-        split_method = KFold(n_splits=2)
+        best_logL = float("-inf")
 
         for num_states in range(self.min_n_components, self.max_n_components):
-
             total_logL = 0
             num_folds = 0
+            split_method = KFold(2)
 
-            for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
-                trainX, train_lengths = combine_sequences(cv_train_idx, self.sequences)
-                test_X, test_lengths = combine_sequences(cv_test_idx, self.sequences)
-                num_folds += 1
+            try:
+                for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                    trainX, train_lengths = combine_sequences(cv_train_idx, self.sequences)
+                    test_X, test_lengths = combine_sequences(cv_test_idx, self.sequences)
 
-                try:
                     model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
                                             random_state=self.random_state, verbose=False).fit(trainX, train_lengths)
                     total_logL += model.score(test_X, test_lengths)
-                except:
-                    pass
+                    num_folds += 1
 
-            if total_logL/num_folds < best_logL:
-                best_logL = total_logL/num_folds
-                best_num_components = num_states
+                # If the current num_states performs better than the last
+                # best option — save the new one.
+                #
+                if num_folds > 0:
+                    if total_logL/num_folds > best_logL:
+                        best_logL = total_logL/num_folds
+                        best_num_components = num_states
+            except:
+                pass
 
+        # Train the new model with the selected num of hidden states on
+        # all available data and return.
         return self.base_model(best_num_components)
