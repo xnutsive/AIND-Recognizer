@@ -87,7 +87,7 @@ class SelectorBIC(ModelSelector):
                                     random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
                 logL = model.score(self.X, self.lengths)
 
-                # FIXME research if I should use X[0] or just X.
+                # FIXME:0 research if I should use X[0] or just X.
                 # seems like a bug
                 params = num_states**2 + 2*num_states*len(self.X[0]) - 1
                 bic = -2 * logL + math.log(len(self.X))*params

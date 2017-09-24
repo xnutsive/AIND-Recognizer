@@ -6,6 +6,9 @@
 __pycache__/
 *.py[cod]
 
+.imdone/**/*
+.imdone
+
 # C extensions
 *.so
 

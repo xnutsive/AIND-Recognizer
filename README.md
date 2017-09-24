@@ -9,6 +9,8 @@
 
 Check out the notebook for details.
 
+----
+
 ### Install
 
 This project requires **Python 3** and the following Python libraries installed:
