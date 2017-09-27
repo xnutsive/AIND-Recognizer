@@ -13,13 +13,22 @@ def recognize_with_lang(models: dict, test_set: SinglesData, language_model):
     # probability as a path cost.
     for s in test_set.sentences_index:
         sentence = test_set.sentences_index[s]
+
+        # if len(sentence) > 5:
+        #     print("Skipped lang for sentence {}".format(sentence))
+        #     continue
+
         print("Running a UCS for sentence: {}".format(sentence))
+
         problem = SentenceProblem(sentence, probabilities, language_model)
         updated_guesses = uniform_cost_search(problem)
 
         if updated_guesses:
             for new_guess in updated_guesses.solution():
 
+                # The indices are due to the sturcture of search problem
+                # state tuple.
+                #
                 i = new_guess[1]
                 w = new_guess[2]
 

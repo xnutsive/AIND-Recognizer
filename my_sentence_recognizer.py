@@ -23,19 +23,35 @@ class SentenceProblem(Problem):
 
     """
 
-    def __init__(self, word_indices, word_probabilities, language_model):
+    def __init__(self, word_indices, probs, language_model):
         self.word_indices = word_indices
-        self.word_probabilities = word_probabilities
         self.language_model = language_model
 
-        Problem.__init__(self, tuple([0]))  # FIXME is empty state OK for init?
+        # weight to use for the language model
+        # predictions
+        self.lm_alpha = 5
+
+        # Seed minimal assumed log_s for sentences
+        self.min_log_s = [0 for w in self.word_indices]
+        self.min_log_s.append(0)
+
+        self.keep_words = 10
+
+        # Only keep 20 most likely used words per word in the
+        # sentence.
+        # This should reduce search space significantly.
+        self.word_probabilities = [dict(sorted(p.items(), key=lambda x: x[1])[-self.keep_words:]) for p in probs]
+
+        Problem.__init__(self, (0, None, '', 0, ''))
 
     def actions(self, state):
         actions = []
         next_word_index = self.word_indices[state[0]]
 
         for word, prob in self.word_probabilities[next_word_index].items():
-            actions.append((state[0] + 1,next_word_index,word,prob))
+            action = (state[0]+1, next_word_index, word, prob,
+                ' '.join(state[4].split(' ')[-3:]) + ' ' + word)
+            actions.append(action)
 
         return actions
 
@@ -44,7 +60,11 @@ class SentenceProblem(Problem):
         """Return the state that results from executing the given
         action in the given state. The action must be one of
         self.actions(state)."""
+
+        # Since actions and states use the same format to store
+        # data, we can just return the action as a resulting state.
         return action
+
 
     def goal_test(self, state):
         return state[0] == len(self.word_indices)
@@ -56,13 +76,28 @@ class SentenceProblem(Problem):
         state2.  If the path does matter, it will consider c and maybe state1
         and action. The default method costs 1 for every step in the path."""
 
-        # TODO actually use a language model here.
-        # TODO apply sentence start and sentence end
+        # c is the cost of previous path segments
+        # state2 is the latest word state. It doesn't have information on
+        # the previous states or words.
 
-        log_p = sum([s[3] for s in [state1, state2] if len(s) > 1])
+        # print("considering " + state2[4])
 
-        return 1/log_p
-        # return c + 1
+        log_p = state2[3]
+        log_s_lang = self.min_log_s[state2[0]]
+
+        phrase = state2[4]
+        # if state2[0] == len(self.word_indices):
+        #     phrase += " </s>"
+        #     print(phrase)
+
+        try:
+            log_s_lang = self.language_model.log_s(phrase)
+            if self.min_log_s[state2[0]] > log_s_lang:
+                self.min_log_s[state2[0]] = log_s_lang
+        except:
+            pass
+
+        return -( log_p + self.lm_alpha * log_s_lang )
 
     def value(self, state):
         """For optimization problems, each state has a value.  Hill-climbing
