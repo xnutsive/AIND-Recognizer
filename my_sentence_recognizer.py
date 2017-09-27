@@ -29,7 +29,7 @@ class SentenceProblem(Problem):
 
         # weight to use for the language model
         # predictions
-        self.lm_alpha = 5
+        self.lm_alpha = 10
 
         # Seed minimal assumed log_s for sentences
         self.min_log_s = [0 for w in self.word_indices]
@@ -86,9 +86,8 @@ class SentenceProblem(Problem):
         log_s_lang = self.min_log_s[state2[0]]
 
         phrase = state2[4]
-        # if state2[0] == len(self.word_indices):
-        #     phrase += " </s>"
-        #     print(phrase)
+        if state2[0] == len(self.word_indices):
+            phrase += " </s>"
 
         try:
             log_s_lang = self.language_model.log_s(phrase)
